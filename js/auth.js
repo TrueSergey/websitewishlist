@@ -4,6 +4,11 @@ async function signUp(email, password, username) {
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          data: {
+            username
+          }
+        }
       });
   
       if (error) {
@@ -18,6 +23,7 @@ async function signUp(email, password, username) {
             id: data.user.id,
             username,
             email,
+            theme: 'light' // Добавляем тему по умолчанию
           },
         ]);
   
@@ -25,7 +31,7 @@ async function signUp(email, password, username) {
         throw profileError;
       }
   
-      return { data };
+      return { data, emailSent: true };
     } catch (error) {
       console.error('Error signing up:', error);
       return { error };
@@ -55,6 +61,23 @@ async function signUp(email, password, username) {
     return { error };
   }
   
+  async function resetPassword(email) {
+    try {
+      const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin + '/reset-password',
+      });
+      
+      if (error) {
+        throw error;
+      }
+      
+      return { data, emailSent: true };
+    } catch (error) {
+      console.error('Error resetting password:', error);
+      return { error };
+    }
+  }
+  
   async function getCurrentUser() {
     const { data, error } = await supabase.auth.getUser();
     
@@ -79,5 +102,18 @@ async function signUp(email, password, username) {
       return null;
     }
     
-    return { ...data.user, ...userData };
+    // Получаем непросмотренные уведомления
+    const { data: notifications, error: notifError } = await supabase
+      .from('notifications')
+      .select('*')
+      .eq('recipient_id', data.user.id)
+      .eq('is_read', false);
+    
+    const hasUnreadNotifications = notifications && notifications.length > 0;
+    
+    return { 
+      ...data.user, 
+      ...userData, 
+      hasUnreadNotifications 
+    };
   }

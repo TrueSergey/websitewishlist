@@ -22,11 +22,59 @@ async function updateProfile(profileData) {
     }
   }
   
+  async function uploadAvatar(file) {
+    try {
+      const user = await getCurrentUser();
+      if (!user) {
+        throw new Error('Пользователь не авторизован');
+      }
+      
+      // Создаем уникальное имя файла для пользователя
+      const fileExt = file.name.split('.').pop();
+      const fileName = `avatar_${user.id}_${Math.random().toString(36).substring(2)}.${fileExt}`;
+      const filePath = `avatars/${fileName}`;
+      
+      // Загружаем файл в хранилище
+      const { data, error } = await supabase.storage
+        .from('user_media')
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: true
+        });
+      
+      if (error) {
+        throw error;
+      }
+      
+      // Получаем публичный URL файла
+      const { data: urlData } = supabase.storage
+        .from('user_media')
+        .getPublicUrl(filePath);
+      
+      // Обновляем URL аватара в профиле пользователя
+      await updateProfile({ avatar_url: urlData.publicUrl });
+      
+      return { url: urlData.publicUrl };
+    } catch (error) {
+      console.error('Error uploading avatar:', error);
+      return { error };
+    }
+  }
+  
   async function updateAvatar(url) {
     try {
       return await updateProfile({ avatar_url: url });
     } catch (error) {
       console.error('Error updating avatar:', error);
+      return { error };
+    }
+  }
+  
+  async function setTheme(theme) {
+    try {
+      return await updateProfile({ theme });
+    } catch (error) {
+      console.error('Error updating theme:', error);
       return { error };
     }
   }
@@ -90,6 +138,42 @@ async function updateProfile(profileData) {
       return { data };
     } catch (error) {
       console.error('Error adding gift:', error);
+      return { error };
+    }
+  }
+  
+  async function uploadGiftImage(file) {
+    try {
+      const user = await getCurrentUser();
+      if (!user) {
+        throw new Error('Пользователь не авторизован');
+      }
+      
+      // Создаем уникальное имя файла
+      const fileExt = file.name.split('.').pop();
+      const fileName = `gift_${user.id}_${Math.random().toString(36).substring(2)}.${fileExt}`;
+      const filePath = `gifts/${fileName}`;
+      
+      // Загружаем файл в хранилище
+      const { data, error } = await supabase.storage
+        .from('user_media')
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: true
+        });
+      
+      if (error) {
+        throw error;
+      }
+      
+      // Получаем публичный URL файла
+      const { data: urlData } = supabase.storage
+        .from('user_media')
+        .getPublicUrl(filePath);
+      
+      return { url: urlData.publicUrl };
+    } catch (error) {
+      console.error('Error uploading gift image:', error);
       return { error };
     }
   }
