@@ -240,18 +240,6 @@
     color: white;
   }
   
-
-  .recommendations-feed {
-    height: 80vh;
-    overflow-y: auto;
-    scroll-snap-type: y mandatory;
-  }
-  
-  .recommendation-card {
-    scroll-snap-align: start;
-    height: 100vh;
-  }
-  
   /* Рекомендации */
   .recommendations-list {
     display: grid;
@@ -738,35 +726,4 @@
       width: 100%;
       height: 120px;
     }
-  }
-
-  .recommendation-card {
-    transition: transform 0.3s, box-shadow 0.3s;
-  }
-  
-  .recommendation-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 8px 15px rgba(0,0,0,0.1);
-  }
-  
-  @keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
-  }
-  
-  .fade-enter-active {
-    animation: fadeIn 0.5s;
-  }
-
-  /* Добавьте в конец styles.css: */
-.dark-theme {
-    --background-color: #1a1a1a;
-    --card-color: #2d2d2d;
-    --text-color: #ffffff;
-  }
-  
-  .theme-toggle {
-    display: flex;
-    gap: 10px;
-    margin-top: 15px;
   }

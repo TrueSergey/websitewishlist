@@ -9,11 +9,9 @@ const app = Vue.createApp({
         password: '',
         username: '',
         authError: null,
-        authSuccess: null,
   
         // Основной интерфейс
         currentTab: 'recommendations',
-        navCollapsed: false,
         notification: {
           show: false,
           message: '',
@@ -23,15 +21,11 @@ const app = Vue.createApp({
         // Профиль
         profile: {},
         showChangeAvatarModal: false,
-        avatarFile: null,
-        avatarPreview: null,
         newAvatarUrl: '',
         showEditProfileModal: false,
         editedProfile: { username: '' },
         myGifts: [],
         showAddGiftModal: false,
-        giftImageFile: null,
-        giftImagePreview: null,
         newGift: {
           title: '',
           description: '',
@@ -42,14 +36,9 @@ const app = Vue.createApp({
         },
         editingGift: false,
         editingGiftId: null,
-        savingGift: false,
   
-        // Рекомендации (TikTok-style)
+        // Рекомендации
         recommendations: [],
-        totalRecommendations: 0,
-        hasMoreRecommendations: true,
-        page: 0,
-        loading: false,
         recommendationSearch: '',
         selectedHashtags: [],
         popularHashtags: [],
@@ -62,28 +51,17 @@ const app = Vue.createApp({
           article_number: '',
           hashtags: ''
         },
-        mediaFile: null,
-        mediaPreview: null,
-        activeRecommendation: null,
-        addingRecommendation: false,
   
         // Друзья
         friends: [],
-        friendRequests: [],
-        sentRequests: [],
         friendSearch: '',
         showAddFriendModal: false,
         friendUsername: '',
         friendError: null,
-        searching: false,
         searchResults: [],
         showFriendGiftsModal: false,
         selectedFriend: {},
         friendGifts: [],
-  
-        // Уведомления
-        notifications: [],
-        showNotificationsModal: false,
   
         // Админ-панель
         isAdmin: false,
@@ -169,46 +147,21 @@ const app = Vue.createApp({
           type
         };
   
-        // Скрываем уведомление через 5 секунд
+        // Скрываем уведомление через 3 секунды
         setTimeout(() => {
-          this.hideNotification();
-        }, 5000);
-      },
-      
-      hideNotification() {
-        this.notification.show = false;
-      },
-      
-      getNotificationIcon() {
-        switch(this.notification.type) {
-          case 'success': return 'bi-check-circle';
-          case 'error': return 'bi-exclamation-circle';
-          case 'info': return 'bi-info-circle';
-          case 'warning': return 'bi-exclamation-triangle';
-          default: return 'bi-bell';
-        }
+          this.notification.show = false;
+        }, 3000);
       },
   
       formatDate(dateString) {
         const date = new Date(dateString);
-        return new Intl.DateTimeFormat('ru-RU', { 
+        return date.toLocaleDateString('ru-RU', { 
           day: '2-digit', 
           month: '2-digit', 
           year: 'numeric',
           hour: '2-digit',
           minute: '2-digit'
-        }).format(date);
-      },
-      
-      changeTab(tab) {
-        this.currentTab = tab;
-        // Прокручиваем к началу страницы при изменении вкладки
-        window.scrollTo(0, 0);
-        
-        // Сбрасываем активную рекомендацию при смене вкладки
-        if (tab !== 'recommendations') {
-          this.activeRecommendation = null;
-        }
+        });
       },
   
       // Методы авторизации
@@ -235,32 +188,14 @@ const app = Vue.createApp({
           return;
         }
   
-        const { data, error, emailSent } = await signUp(this.email, this.password, this.username);
+        const { data, error } = await signUp(this.email, this.password, this.username);
         
         if (error) {
           this.authError = error.message || 'Ошибка регистрации';
           return;
         }
   
-        this.authSuccess = 'Регистрация успешна! На ваш email отправлено письмо для подтверждения.';
-        this.authMode = 'login';
-        this.resetAuthForm();
-      },
-      
-      async resetPassword() {
-        if (!this.email) {
-          this.authError = 'Пожалуйста, введите email';
-          return;
-        }
-        
-        const { error, emailSent } = await resetPassword(this.email);
-        
-        if (error) {
-          this.authError = error.message || 'Ошибка восстановления пароля';
-          return;
-        }
-        
-        this.authSuccess = 'На ваш email отправлено письмо для восстановления пароля.';
+        this.showNotification('Регистрация успешна! Теперь вы можете войти в систему.');
         this.authMode = 'login';
         this.resetAuthForm();
       },
@@ -276,105 +211,24 @@ const app = Vue.createApp({
         this.password = '';
         this.username = '';
         this.authError = null;
-        
-        // Автоматически скрываем сообщение об успехе через 5 секунд
-        if (this.authSuccess) {
-          setTimeout(() => {
-            this.authSuccess = null;
-          }, 5000);
-        }
       },
   
       resetAllData() {
         this.profile = {};
         this.recommendations = [];
         this.friends = [];
-        this.friendRequests = [];
-        this.sentRequests = [];
         this.myGifts = [];
         this.popularHashtags = [];
-        this.notifications = [];
         this.currentTab = 'recommendations';
         this.isAdmin = false;
         this.allUsers = [];
         this.allRecommendations = [];
-        this.page = 0;
-        this.totalRecommendations = 0;
-        this.hasMoreRecommendations = true;
       },
   
-      // Методы для рекомендаций (TikTok-style)
-      async fetchRecommendations(refresh = false) {
-        if (refresh) {
-          this.page = 0;
-          this.recommendations = [];
-          this.hasMoreRecommendations = true;
-        }
-        
-        if (!this.hasMoreRecommendations || this.loading) return;
-        
-        this.loading = true;
-        
-        const { recommendations, totalCount, hasMore } = await getRecommendations(this.page);
-        
-        // Получаем информацию о лайках для каждой рекомендации
-        for (const rec of recommendations) {
-          const { count } = await getRecommendationLikes(rec.id);
-          rec.likes = count;
-          // TODO: Добавить проверку, лайкнул ли текущий пользователь
-          rec.isLiked = false; // Заглушка для примера
-        }
-        
-        this.recommendations = refresh ? recommendations : [...this.recommendations, ...recommendations];
-        this.totalRecommendations = totalCount;
-        this.hasMoreRecommendations = hasMore;
-        this.page++;
-        this.loading = false;
-        
-        if (refresh) {
-          this.popularHashtags = await getPopularHashtags();
-        }
-      },
-      
-      handleRecommendationScroll(event) {
-        const { scrollTop, scrollHeight, clientHeight } = event.target;
-        
-        // Когда пользователь проскроллил до 70% контента, загружаем еще
-        if (scrollTop + clientHeight > scrollHeight * 0.7 && !this.loading && this.hasMoreRecommendations) {
-          this.fetchRecommendations();
-        }
-      },
-      
-      isVideoUrl(url) {
-        if (!url) return false;
-        return url.endsWith('.mp4') || url.endsWith('.webm') || url.endsWith('.ogg') || 
-               url.includes('video') || url.includes('mp4');
-      },
-      
-      isVideoFile(file) {
-        if (!file) return false;
-        return file.type.startsWith('video/');
-      },
-      
-      setActiveRecommendation(id) {
-        this.activeRecommendation = id;
-      },
-      
-      handleMediaUpload(event) {
-        const file = event.target.files[0];
-        if (!file) return;
-        
-        this.mediaFile = file;
-        this.mediaPreview = URL.createObjectURL(file);
-      },
-      
-      removeMedia() {
-        this.mediaFile = null;
-        this.mediaPreview = null;
-        
-        // Сбрасываем input
-        const input = document.getElementById('media-upload');
-        if (input) input.value = '';
+      // Методы для рекомендаций
+      async fetchRecommendations() {
+        this.recommendations = await getRecommendations();
+        this.popularHashtags = await getPopularHashtags();
       },
   
       async addRecommendation() {
@@ -383,11 +237,7 @@ const app = Vue.createApp({
           return;
         }
   
-        this.addingRecommendation = true;
-        
-        const { data, error } = await addRecommendation(this.newRecommendation, this.mediaFile);
-        
-        this.addingRecommendation = false;
+        const { data, error } = await addRecommendation(this.newRecommendation);
         
         if (error) {
           this.showNotification(error.message || 'Ошибка при добавлении рекомендации', 'error');
@@ -404,11 +254,7 @@ const app = Vue.createApp({
           article_number: '',
           hashtags: ''
         };
-        this.mediaFile = null;
-        this.mediaPreview = null;
-        
-        // Обновляем список рекомендаций
-        this.fetchRecommendations(true);
+        this.fetchRecommendations();
       },
   
       async deleteRecommendation(id) {
@@ -424,28 +270,9 @@ const app = Vue.createApp({
         }
   
         this.showNotification('Рекомендация успешно удалена');
-        // Обновляем локальный список рекомендаций
-        this.recommendations = this.recommendations.filter(rec => rec.id !== id);
-        
+        this.fetchRecommendations();
         if (this.isAdmin) {
           this.fetchAdminRecommendations();
-        }
-      },
-      
-      async likeRecommendation(recommendation) {
-        const { action, error } = await likeRecommendation(recommendation.id);
-        
-        if (error) {
-          this.showNotification(error.message || 'Ошибка при взаимодействии с рекомендацией', 'error');
-          return;
-        }
-        
-        if (action === 'liked') {
-          recommendation.likes = (recommendation.likes || 0) + 1;
-          recommendation.isLiked = true;
-        } else if (action === 'unliked') {
-          recommendation.likes = Math.max(0, (recommendation.likes || 0) - 1);
-          recommendation.isLiked = false;
         }
       },
   
@@ -467,8 +294,6 @@ const app = Vue.createApp({
       // Методы для друзей
       async fetchFriends() {
         this.friends = await getFriends();
-        this.friendRequests = await getFriendRequests();
-        this.sentRequests = await getSentRequests();
       },
   
       async searchFriends() {
@@ -478,9 +303,7 @@ const app = Vue.createApp({
           return;
         }
   
-        this.searching = true;
         this.searchResults = await searchUsers(this.friendUsername);
-        this.searching = false;
         
         if (this.searchResults.length === 0) {
           this.friendError = 'Пользователи не найдены';
@@ -489,93 +312,24 @@ const app = Vue.createApp({
         }
       },
   
-      async sendRequest(user) {
-        const { error } = await sendFriendRequest(user.id);
+      async addFriend() {
+        await this.searchFriends();
+      },
+  
+      async selectFriend(friend) {
+        const { error } = await addFriend(friend.id);
         
         if (error) {
-          this.showNotification(error.message || 'Ошибка при отправке запроса', 'error');
+          this.showNotification(error.message || 'Ошибка при добавлении друга', 'error');
           return;
         }
   
-        this.showNotification(`Запрос дружбы отправлен пользователю ${user.username}`);
+        this.showNotification(`${friend.username} успешно добавлен в друзья`);
         this.showAddFriendModal = false;
         this.friendUsername = '';
         this.searchResults = [];
-        
-        // Обновляем список отправленных запросов
+        this.friendError = null;
         this.fetchFriends();
-      },
-      
-      async acceptFriendRequest(requestId) {
-        const { error } = await acceptFriendRequest(requestId);
-        
-        if (error) {
-          this.showNotification(error.message || 'Ошибка при принятии запроса', 'error');
-          return;
-        }
-  
-        this.showNotification('Запрос дружбы принят');
-        
-        // Обновляем списки друзей и запросов
-        this.fetchFriends();
-      },
-      
-      async rejectFriendRequest(requestId) {
-        const { error } = await rejectFriendRequest(requestId);
-        
-        if (error) {
-          this.showNotification(error.message || 'Ошибка при отклонении запроса', 'error');
-          return;
-        }
-  
-        this.showNotification('Запрос дружбы отклонен');
-        
-        // Обновляем список запросов
-        this.fetchFriends();
-      },
-      
-      async cancelFriendRequest(requestId) {
-        const { error } = await cancelFriendRequest(requestId);
-        
-        if (error) {
-          this.showNotification(error.message || 'Ошибка при отмене запроса', 'error');
-          return;
-        }
-  
-        this.showNotification('Запрос дружбы отменен');
-        
-        // Обновляем список отправленных запросов
-        this.fetchFriends();
-      },
-  
-      async acceptFriendRequestFromNotification(notification) {
-        // Получаем ID запроса из метаданных уведомления или из другого источника
-        // В этом примере предполагается, что есть какая-то связь с запросом
-        const requestId = notification.data?.request_id;
-        
-        if (!requestId) {
-          this.showNotification('Не удалось найти запрос на дружбу', 'error');
-          return;
-        }
-        
-        await this.acceptFriendRequest(requestId);
-        
-        // Отмечаем уведомление как прочитанное
-        await this.markNotificationAsRead(notification.id);
-      },
-      
-      async rejectFriendRequestFromNotification(notification) {
-        const requestId = notification.data?.request_id;
-        
-        if (!requestId) {
-          this.showNotification('Не удалось найти запрос на дружбу', 'error');
-          return;
-        }
-        
-        await this.rejectFriendRequest(requestId);
-        
-        // Отмечаем уведомление как прочитанное
-        await this.markNotificationAsRead(notification.id);
       },
   
       async removeFriend(friendId) {
@@ -635,58 +389,6 @@ const app = Vue.createApp({
         this.showNotification('Подарок скопирован в ваш список желаний');
         this.fetchMyGifts();
       },
-      
-      // Методы для уведомлений
-      async fetchNotifications() {
-        this.notifications = await getMyNotifications();
-      },
-      
-      async markNotificationAsRead(notificationId) {
-        const { error } = await markNotificationAsRead(notificationId);
-        
-        if (error) {
-          console.error('Error marking notification as read:', error);
-          return;
-        }
-        
-        // Обновляем статус уведомления локально
-        const index = this.notifications.findIndex(n => n.id === notificationId);
-        if (index !== -1) {
-          this.notifications[index].is_read = true;
-        }
-        
-        // Обновляем информацию о пользователе, чтобы скрыть индикатор непрочитанных уведомлений
-        this.fetchUserData();
-      },
-      
-      async markAllNotificationsAsRead() {
-        const { error } = await markAllNotificationsAsRead();
-        
-        if (error) {
-          this.showNotification('Ошибка при отметке уведомлений', 'error');
-          return;
-        }
-        
-        // Обновляем статус всех уведомлений локально
-        this.notifications.forEach(notification => {
-          notification.is_read = true;
-        });
-        
-        // Обновляем информацию о пользователе
-        this.fetchUserData();
-      },
-      
-      async deleteNotification(notificationId) {
-        const { error } = await deleteNotification(notificationId);
-        
-        if (error) {
-          console.error('Error deleting notification:', error);
-          return;
-        }
-        
-        // Удаляем уведомление из локального списка
-        this.notifications = this.notifications.filter(n => n.id !== notificationId);
-      },
   
       // Методы для профиля
       async fetchUserData() {
@@ -696,92 +398,45 @@ const app = Vue.createApp({
           this.profile = {
             username: this.user.username,
             email: this.user.email,
-            avatar_url: this.user.avatar_url,
-            theme: this.user.theme || 'light'
+            avatar_url: this.user.avatar_url
           };
           
           this.isAdmin = this.user.is_admin || false;
           
           // Загружаем данные для всех вкладок
-          this.fetchRecommendations(true);
+          this.fetchRecommendations();
           this.fetchFriends();
           this.fetchMyGifts();
-          this.fetchNotifications();
           
           // Если пользователь админ, загружаем админские данные
           if (this.isAdmin) {
             this.fetchAdminData();
           }
-          
-          // Применяем тему
-          document.body.className = this.user.theme === 'dark' ? 'dark-theme' : '';
         }
       },
   
       async fetchMyGifts() {
         this.myGifts = await getMyGifts();
       },
-      
-      handleAvatarUpload(event) {
-        const file = event.target.files[0];
-        if (!file) return;
-        
-        this.avatarFile = file;
-        this.avatarPreview = URL.createObjectURL(file);
-      },
-      
-      removeAvatarPreview() {
-        this.avatarFile = null;
-        this.avatarPreview = null;
-        
-        // Сбрасываем input
-        const input = document.getElementById('avatar-upload');
-        if (input) input.value = '';
-      },
   
       async updateAvatar() {
-        if (!this.avatarFile && !this.newAvatarUrl) {
-          this.showNotification('Пожалуйста, выберите или укажите изображение', 'error');
+        if (!this.newAvatarUrl) {
+          this.showNotification('Укажите URL изображения', 'error');
           return;
         }
   
-        let result;
+        const { error } = await updateAvatar(this.newAvatarUrl);
         
-        if (this.avatarFile) {
-          result = await uploadAvatar(this.avatarFile);
-        } else {
-          result = await updateAvatar(this.newAvatarUrl);
-        }
-        
-        if (result.error) {
-          this.showNotification(result.error.message || 'Ошибка при обновлении аватара', 'error');
+        if (error) {
+          this.showNotification(error.message || 'Ошибка при обновлении аватара', 'error');
           return;
         }
   
         this.showNotification('Аватар успешно обновлен');
-        this.profile.avatar_url = result.url || this.newAvatarUrl;
+        this.profile.avatar_url = this.newAvatarUrl;
         this.showChangeAvatarModal = false;
-        this.avatarFile = null;
-        this.avatarPreview = null;
         this.newAvatarUrl = '';
         this.fetchUserData();
-      },
-      
-      async changeTheme(theme) {
-        const { error } = await setTheme(theme);
-        
-        if (error) {
-          this.showNotification(error.message || 'Ошибка при изменении темы', 'error');
-          return;
-        }
-        
-        this.profile.theme = theme;
-        this.user.theme = theme;
-        
-        // Применяем тему
-        document.body.className = theme === 'dark' ? 'dark-theme' : '';
-        
-        this.showNotification(`Тема изменена на ${theme === 'dark' ? 'темную' : 'светлую'}`);
       },
   
       async updateProfile() {
@@ -802,29 +457,11 @@ const app = Vue.createApp({
         this.showEditProfileModal = false;
         this.fetchUserData();
       },
-      
-      handleGiftImageUpload(event) {
-        const file = event.target.files[0];
-        if (!file) return;
-        
-        this.giftImageFile = file;
-        this.giftImagePreview = URL.createObjectURL(file);
-      },
-      
-      removeGiftImagePreview() {
-        this.giftImageFile = null;
-        this.giftImagePreview = null;
-        
-        // Сбрасываем input
-        const input = document.getElementById('gift-image-upload');
-        if (input) input.value = '';
-      },
   
       editGift(gift) {
         this.newGift = { ...gift };
         this.editingGift = true;
         this.editingGiftId = gift.id;
-        this.giftImagePreview = gift.image_url || null;
         this.showAddGiftModal = true;
       },
   
@@ -839,8 +476,6 @@ const app = Vue.createApp({
         };
         this.editingGift = false;
         this.editingGiftId = null;
-        this.giftImageFile = null;
-        this.giftImagePreview = null;
         this.showAddGiftModal = false;
       },
   
@@ -848,21 +483,6 @@ const app = Vue.createApp({
         if (!this.newGift.title) {
           this.showNotification('Название подарка обязательно для заполнения', 'error');
           return;
-        }
-        
-        this.savingGift = true;
-        
-        // Если есть новое изображение, сначала загружаем его
-        if (this.giftImageFile) {
-          const { url, error: uploadError } = await uploadGiftImage(this.giftImageFile);
-          
-          if (uploadError) {
-            this.savingGift = false;
-            this.showNotification(uploadError.message || 'Ошибка при загрузке изображения', 'error');
-            return;
-          }
-          
-          this.newGift.image_url = url;
         }
   
         let result;
@@ -872,8 +492,6 @@ const app = Vue.createApp({
         } else {
           result = await addGift(this.newGift);
         }
-        
-        this.savingGift = false;
         
         if (result.error) {
           this.showNotification(result.error.message || 'Ошибка при сохранении подарка', 'error');
@@ -964,31 +582,6 @@ const app = Vue.createApp({
           this.searchResults = [];
         }
       });
-      
-      // Вешаем слушатель на изменение размера окна для адаптивности
-      window.addEventListener('resize', this.handleResize);
-      
-      // Проверяем размер окна при загрузке
-      this.handleResize();
-      
-      // Прокрутка рекомендаций для мобильных устройств
-      const isMobile = window.innerWidth < 768;
-      if (isMobile) {
-        this.navCollapsed = true;
-      }
-    },
-    beforeUnmount() {
-      // Удаляем слушатель при уничтожении компонента
-      window.removeEventListener('resize', this.handleResize);
-    },
-    methods: {
-      // Добавляем этот метод для адаптивности интерфейса
-      handleResize() {
-        const isMobile = window.innerWidth < 768;
-        if (isMobile) {
-          this.navCollapsed = true;
-        }
-      }
     }
   });
   

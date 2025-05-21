@@ -2,227 +2,120 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
-  <title>GiftMate | Находи и дари идеальные подарки</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Сайт подарков друзьям</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
   <link rel="stylesheet" href="css/styles.css">
   <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
-  <div id="app" :class="user && user.theme === 'dark' ? 'dark-theme' : ''">
+  <div id="app">
     <!-- Экран авторизации -->
     <div class="auth-screen" v-if="!user">
       <div class="auth-container">
-        <div class="logo-container">
-          <img src="img/giftmate-logo.svg" alt="GiftMate Logo" class="auth-logo">
-          <h1>GiftMate</h1>
-          <p class="slogan">Находи и дари идеальные подарки</p>
-        </div>
-        
+        <h1>Подарки Друзьям</h1>
         <div class="auth-tabs">
           <button :class="{ active: authMode === 'login' }" @click="authMode = 'login'">Вход</button>
           <button :class="{ active: authMode === 'register' }" @click="authMode = 'register'">Регистрация</button>
-          <button :class="{ active: authMode === 'reset' }" @click="authMode = 'reset'">Восстановление</button>
         </div>
-        
         <div class="auth-form">
-          <transition name="fade" mode="out-in">
-            <div v-if="authMode === 'login'" key="login">
-              <input type="email" v-model="email" placeholder="Электронная почта">
-              <input type="password" v-model="password" placeholder="Пароль">
-              <button @click="login" class="pulse-btn">Войти</button>
-            </div>
-            
-            <div v-else-if="authMode === 'register'" key="register">
-              <input type="text" v-model="username" placeholder="Имя пользователя">
-              <input type="email" v-model="email" placeholder="Электронная почта">
-              <input type="password" v-model="password" placeholder="Пароль">
-              <button @click="register" class="pulse-btn">Зарегистрироваться</button>
-            </div>
-            
-            <div v-else key="reset">
-              <input type="email" v-model="email" placeholder="Электронная почта">
-              <button @click="resetPassword" class="pulse-btn">Восстановить пароль</button>
-            </div>
-          </transition>
-          
+          <div v-if="authMode === 'login'">
+            <input type="email" v-model="email" placeholder="Электронная почта">
+            <input type="password" v-model="password" placeholder="Пароль">
+            <button @click="login">Войти</button>
+          </div>
+          <div v-else>
+            <input type="text" v-model="username" placeholder="Имя пользователя">
+            <input type="email" v-model="email" placeholder="Электронная почта">
+            <input type="password" v-model="password" placeholder="Пароль">
+            <button @click="register">Зарегистрироваться</button>
+          </div>
           <p v-if="authError" class="error-message">{{ authError }}</p>
-          <p v-if="authSuccess" class="success-message">{{ authSuccess }}</p>
-        </div>
-        
-        <div class="auth-footer">
-          <p>Создавайте списки желаний, делитесь ими с друзьями и находите идеальные подарки!</p>
         </div>
       </div>
     </div>
 
     <!-- Основной интерфейс -->
     <div class="main-app" v-else>
-      <nav :class="{ 'nav-collapsed': navCollapsed }">
-        <div class="nav-header">
-          <img src="img/giftmate-logo.svg" alt="GiftMate Logo" class="nav-logo">
-          <span class="logo-text" v-if="!navCollapsed">GiftMate</span>
-          <button class="collapse-btn" @click="navCollapsed = !navCollapsed">
-            <i class="bi" :class="navCollapsed ? 'bi-chevron-right' : 'bi-chevron-left'"></i>
-          </button>
-        </div>
-        
+      <nav>
+        <div class="logo">Подарки Друзьям</div>
         <div class="nav-items">
-          <button :class="{ active: currentTab === 'recommendations' }" @click="changeTab('recommendations')">
-            <i class="bi bi-gift"></i> 
-            <span v-if="!navCollapsed">Рекомендации</span>
+          <button :class="{ active: currentTab === 'recommendations' }" @click="currentTab = 'recommendations'">
+            <i class="bi bi-gift"></i> Рекомендации
           </button>
-          <button :class="{ active: currentTab === 'friends' }" @click="changeTab('friends')">
-            <i class="bi bi-people"></i>
-            <span v-if="!navCollapsed">Друзья</span>
-            <span v-if="friendRequests.length > 0 && !navCollapsed" class="badge">{{ friendRequests.length }}</span>
+          <button :class="{ active: currentTab === 'friends' }" @click="currentTab = 'friends'">
+            <i class="bi bi-people"></i> Друзья
           </button>
-          <button :class="{ active: currentTab === 'profile' }" @click="changeTab('profile')">
-            <i class="bi bi-person"></i>
-            <span v-if="!navCollapsed">Профиль</span>
+          <button :class="{ active: currentTab === 'profile' }" @click="currentTab = 'profile'">
+            <i class="bi bi-person"></i> Профиль
           </button>
-          <button v-if="isAdmin" :class="{ active: currentTab === 'admin' }" @click="changeTab('admin')">
-            <i class="bi bi-gear"></i>
-            <span v-if="!navCollapsed">Админ-панель</span>
+          <button v-if="isAdmin" :class="{ active: currentTab === 'admin' }" @click="currentTab = 'admin'">
+            <i class="bi bi-gear"></i> Админ-панель
           </button>
         </div>
-        
-        <div class="nav-footer">
-          <button class="notification-btn" @click="showNotificationsModal = true">
-            <i class="bi bi-bell"></i>
-            <span v-if="!navCollapsed">Уведомления</span>
-            <span v-if="user.hasUnreadNotifications" class="notification-indicator"></span>
-          </button>
-          <button class="logout-btn" @click="logout">
-            <i class="bi bi-box-arrow-right"></i>
-            <span v-if="!navCollapsed">Выйти</span>
-          </button>
-        </div>
+        <button class="logout-btn" @click="logout">
+          <i class="bi bi-box-arrow-right"></i>
+        </button>
       </nav>
 
-      <main :class="{ 'main-expanded': navCollapsed }">
-        <!-- Вкладка рекомендаций (TikTok-style) -->
-        <div v-if="currentTab === 'recommendations'" class="tab-content recommendation-tab">
+      <main>
+        <!-- Вкладка рекомендаций -->
+        <div v-if="currentTab === 'recommendations'" class="tab-content">
           <div class="tab-header">
             <h2>Рекомендации подарков</h2>
-            <div class="tab-actions">
-              <button class="add-btn" @click="showAddRecommendationModal = true">
-                <i class="bi bi-plus-circle"></i> Добавить
-              </button>
+            <button class="add-btn" @click="showAddRecommendationModal = true">
+              <i class="bi bi-plus-circle"></i> Добавить
+            </button>
+          </div>
+
+          <div class="search-container">
+            <input type="text" v-model="recommendationSearch" placeholder="Поиск по названию...">
+            <div class="hashtags-filter">
+              <div v-for="tag in popularHashtags" :key="tag" 
+                   :class="['hashtag', { active: selectedHashtags.includes(tag) }]"
+                   @click="toggleHashtag(tag)">
+                #{{ tag }}
+              </div>
             </div>
           </div>
 
-          <div class="recommendations-container">
-            <div class="recommendations-sidebar">
-              <div class="search-container">
-                <input type="text" v-model="recommendationSearch" placeholder="Поиск...">
-                <i class="bi bi-search"></i>
+          <div class="recommendations-list">
+            <div v-for="recommendation in filteredRecommendations" :key="recommendation.id" class="recommendation-card">
+              <div class="recommendation-video" v-if="recommendation.media_url && recommendation.media_url.includes('mp4')">
+                <video controls>
+                  <source :src="recommendation.media_url" type="video/mp4">
+                </video>
               </div>
-              
-              <div class="hashtags-container">
-                <h3>Популярные темы</h3>
-                <div class="hashtags-list">
-                  <div v-for="tag in popularHashtags" :key="tag" 
-                       :class="['hashtag', { active: selectedHashtags.includes(tag) }]"
-                       @click="toggleHashtag(tag)">
+              <div class="recommendation-image" v-else-if="recommendation.media_url">
+                <img :src="recommendation.media_url" alt="Изображение подарка">
+              </div>
+              <div class="recommendation-info">
+                <h3>{{ recommendation.title }}</h3>
+                <p>{{ recommendation.description }}</p>
+                <div class="recommendation-links" v-if="recommendation.link || recommendation.article_number">
+                  <a v-if="recommendation.link" :href="recommendation.link" target="_blank">
+                    <i class="bi bi-link-45deg"></i> Ссылка на товар
+                  </a>
+                  <span v-if="recommendation.article_number">
+                    <i class="bi bi-upc"></i> Артикул: {{ recommendation.article_number }}
+                  </span>
+                </div>
+                <div class="recommendation-hashtags">
+                  <span v-for="tag in recommendation.hashtags" :key="tag" class="hashtag" @click="selectHashtag(tag)">
                     #{{ tag }}
-                  </div>
+                  </span>
+                </div>
+                <div class="recommendation-actions" v-if="recommendation.user_id === user.id || isAdmin">
+                  <button class="delete-btn" @click="deleteRecommendation(recommendation.id)">
+                    <i class="bi bi-trash"></i>
+                  </button>
                 </div>
               </div>
             </div>
-            
-            <!-- TikTok-style рекомендации -->
-            <div class="recommendations-feed" ref="recommendationsFeed" @scroll="handleRecommendationScroll">
-              <div v-if="loading && page === 0" class="loading-indicator">
-                <div class="spinner"></div>
-                <p>Загрузка рекомендаций...</p>
-              </div>
-              
-              <div v-else-if="filteredRecommendations.length === 0" class="empty-state">
-                <i class="bi bi-emoji-frown"></i>
-                <p>Нет рекомендаций, соответствующих критериям поиска</p>
-              </div>
-              
-              <div v-for="recommendation in filteredRecommendations" 
-                   :key="recommendation.id" 
-                   class="recommendation-card"
-                   :class="{ 'active': activeRecommendation === recommendation.id }"
-                   @click="setActiveRecommendation(recommendation.id)">
-                
-                <!-- Медиа-контент -->
-                <div class="recommendation-media">
-                  <div v-if="recommendation.media_url && isVideoUrl(recommendation.media_url)" class="recommendation-video">
-                    <video loop controls>
-                      <source :src="recommendation.media_url" type="video/mp4">
-                    </video>
-                  </div>
-                  <div v-else-if="recommendation.media_url" class="recommendation-image" :style="{ backgroundImage: `url(${recommendation.media_url})` }">
-                  </div>
-                  <div v-else class="recommendation-no-media">
-                    <i class="bi bi-gift"></i>
-                  </div>
-                </div>
-                
-                <!-- Информация о рекомендации -->
-                <div class="recommendation-details">
-                  <div class="recommendation-header">
-                    <div class="recommendation-author">
-                      <img :src="recommendation.avatar_url || 'img/default-avatar.png'" alt="Аватар">
-                      <span>{{ recommendation.username }}</span>
-                    </div>
-                    
-                    <div class="recommendation-actions" v-if="recommendation.user_id === user.id || isAdmin">
-                      <button class="delete-btn" @click.stop="deleteRecommendation(recommendation.id)">
-                        <i class="bi bi-trash"></i>
-                      </button>
-                    </div>
-                  </div>
-                  
-                  <div class="recommendation-content">
-                    <h3>{{ recommendation.title }}</h3>
-                    <p>{{ recommendation.description }}</p>
-                    
-                    <div class="recommendation-links" v-if="recommendation.link || recommendation.article_number">
-                      <a v-if="recommendation.link" :href="recommendation.link" target="_blank" @click.stop>
-                        <i class="bi bi-link-45deg"></i> Ссылка на товар
-                      </a>
-                      <span v-if="recommendation.article_number">
-                        <i class="bi bi-upc"></i> Артикул: {{ recommendation.article_number }}
-                      </span>
-                    </div>
-                  </div>
-                  
-                  <div class="recommendation-footer">
-                    <div class="recommendation-hashtags">
-                      <span v-for="tag in recommendation.hashtags" :key="tag" 
-                            class="hashtag" 
-                            @click.stop="selectHashtag(tag)">
-                        #{{ tag }}
-                      </span>
-                    </div>
-                    
-                    <div class="recommendation-stats">
-                      <button class="like-btn" :class="{ liked: recommendation.isLiked }" @click.stop="likeRecommendation(recommendation)">
-                        <i class="bi" :class="recommendation.isLiked ? 'bi-heart-fill' : 'bi-heart'"></i>
-                        <span>{{ recommendation.likes || 0 }}</span>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              
-              <div v-if="loading && page > 0" class="loading-more">
-                <div class="spinner"></div>
-                <p>Загрузка...</p>
-              </div>
-              
-              <div v-if="!loading && !hasMoreRecommendations && filteredRecommendations.length > 0" class="end-of-feed">
-                <p>Вы просмотрели все рекомендации</p>
-              </div>
+            <div v-if="filteredRecommendations.length === 0" class="empty-state">
+              <i class="bi bi-emoji-frown"></i>
+              <p>Нет рекомендаций, соответствующих критериям поиска</p>
             </div>
           </div>
 
@@ -236,39 +129,14 @@
                 </button>
               </div>
               <div class="modal-body">
-                <input type="text" v-model="newRecommendation.title" placeholder="Название подарка" maxlength="100">
-                <textarea v-model="newRecommendation.description" placeholder="Описание" maxlength="500"></textarea>
-                
-                <div class="media-upload-container">
-                  <label for="media-upload" class="media-upload-label">
-                    <div v-if="!mediaPreview" class="upload-placeholder">
-                      <i class="bi bi-cloud-arrow-up"></i>
-                      <span>Загрузить фото или видео</span>
-                    </div>
-                    <div v-else-if="isVideoFile(mediaFile)" class="media-preview">
-                      <video controls>
-                        <source :src="mediaPreview" type="video/mp4">
-                      </video>
-                    </div>
-                    <div v-else class="media-preview">
-                      <img :src="mediaPreview" alt="Preview">
-                    </div>
-                  </label>
-                  <input type="file" id="media-upload" accept="image/*,video/*" @change="handleMediaUpload" class="hidden-input">
-                  <button v-if="mediaPreview" class="remove-media-btn" @click="removeMedia">
-                    <i class="bi bi-x-circle"></i>
-                  </button>
-                </div>
-                
+                <input type="text" v-model="newRecommendation.title" placeholder="Название подарка">
+                <textarea v-model="newRecommendation.description" placeholder="Описание"></textarea>
+                <input type="text" v-model="newRecommendation.media_url" placeholder="URL фото или видео">
                 <input type="text" v-model="newRecommendation.link" placeholder="Ссылка на товар (если есть)">
                 <input type="text" v-model="newRecommendation.article_number" placeholder="Артикул (если есть)">
                 <input type="text" v-model="newRecommendation.hashtags" placeholder="Хэштеги через запятую">
-                
                 <div class="modal-actions">
-                  <button @click="addRecommendation" :disabled="addingRecommendation">
-                    <span v-if="!addingRecommendation">Добавить</span>
-                    <span v-else class="spinner-small"></span>
-                  </button>
+                  <button @click="addRecommendation">Добавить</button>
                 </div>
               </div>
             </div>
@@ -276,90 +144,38 @@
         </div>
 
         <!-- Вкладка друзей -->
-        <div v-if="currentTab === 'friends'" class="tab-content friends-tab">
+        <div v-if="currentTab === 'friends'" class="tab-content">
           <div class="tab-header">
             <h2>Мои друзья</h2>
-            <div class="tab-actions">
-              <button class="add-btn" @click="showAddFriendModal = true">
-                <i class="bi bi-person-plus"></i> Добавить
-              </button>
-            </div>
+            <button class="add-btn" @click="showAddFriendModal = true">
+              <i class="bi bi-person-plus"></i> Добавить
+            </button>
           </div>
 
-          <div class="friends-container">
-            <!-- Запросы в друзья -->
-            <div v-if="friendRequests.length > 0" class="friend-requests-section">
-              <h3>Запросы в друзья</h3>
-              <div class="friend-requests">
-                <div v-for="request in friendRequests" :key="request.id" class="friend-request-card">
-                  <div class="friend-info">
-                    <div class="friend-avatar">
-                      <img :src="request.avatar_url || 'img/default-avatar.png'" :alt="request.username">
-                    </div>
-                    <h4>{{ request.username }}</h4>
-                  </div>
-                  <div class="request-actions">
-                    <button class="accept-btn" @click="acceptFriendRequest(request.requestId)">
-                      <i class="bi bi-check-lg"></i> Принять
-                    </button>
-                    <button class="reject-btn" @click="rejectFriendRequest(request.requestId)">
-                      <i class="bi bi-x-lg"></i> Отклонить
-                    </button>
-                  </div>
+          <div class="search-container">
+            <input type="text" v-model="friendSearch" placeholder="Поиск по имени...">
+          </div>
+
+          <div class="friends-list">
+            <div v-for="friend in filteredFriends" :key="friend.id" class="friend-card">
+              <div class="friend-info">
+                <div class="friend-avatar">
+                  <img :src="friend.avatar_url || 'https://via.placeholder.com/50'" :alt="friend.username">
                 </div>
+                <h3>{{ friend.username }}</h3>
+              </div>
+              <div class="friend-actions">
+                <button class="view-btn" @click="viewFriendGifts(friend)">
+                  <i class="bi bi-gift"></i> Список желаний
+                </button>
+                <button class="delete-btn" @click="removeFriend(friend.id)">
+                  <i class="bi bi-person-x"></i>
+                </button>
               </div>
             </div>
-            
-            <!-- Исходящие запросы -->
-            <div v-if="sentRequests.length > 0" class="sent-requests-section">
-              <h3>Отправленные запросы</h3>
-              <div class="sent-requests">
-                <div v-for="request in sentRequests" :key="request.id" class="sent-request-card">
-                  <div class="friend-info">
-                    <div class="friend-avatar">
-                      <img :src="request.avatar_url || 'img/default-avatar.png'" :alt="request.username">
-                    </div>
-                    <h4>{{ request.username }}</h4>
-                  </div>
-                  <div class="request-actions">
-                    <button class="cancel-btn" @click="cancelFriendRequest(request.requestId)">
-                      <i class="bi bi-x-lg"></i> Отменить
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            <!-- Список друзей -->
-            <div class="friends-section">
-              <div class="search-container">
-                <input type="text" v-model="friendSearch" placeholder="Поиск друзей...">
-                <i class="bi bi-search"></i>
-              </div>
-              
-              <div class="friends-list">
-                <div v-for="friend in filteredFriends" :key="friend.id" class="friend-card">
-                  <div class="friend-info">
-                    <div class="friend-avatar">
-                      <img :src="friend.avatar_url || 'img/default-avatar.png'" :alt="friend.username">
-                    </div>
-                    <h3>{{ friend.username }}</h3>
-                  </div>
-                  <div class="friend-actions">
-                    <button class="view-btn" @click="viewFriendGifts(friend)">
-                      <i class="bi bi-gift"></i> Список желаний
-                    </button>
-                    <button class="delete-btn" @click="removeFriend(friend.id)">
-                      <i class="bi bi-person-x"></i>
-                    </button>
-                  </div>
-                </div>
-                
-                <div v-if="filteredFriends.length === 0" class="empty-state">
-                  <i class="bi bi-emoji-frown"></i>
-                  <p>У вас пока нет друзей. Добавьте друзей, чтобы видеть их желаемые подарки.</p>
-                </div>
-              </div>
+            <div v-if="filteredFriends.length === 0" class="empty-state">
+              <i class="bi bi-emoji-frown"></i>
+              <p>У вас пока нет друзей. Добавьте друзей, чтобы видеть их желаемые подарки.</p>
             </div>
           </div>
 
@@ -433,40 +249,21 @@
                 </button>
               </div>
               <div class="modal-body">
-                <div class="search-container">
-                  <input type="text" v-model="friendUsername" placeholder="Имя пользователя или email">
-                  <i class="bi bi-search"></i>
+                <input type="text" v-model="friendUsername" placeholder="Имя пользователя или email">
+                <div class="modal-actions">
+                  <button @click="addFriend">Добавить</button>
                 </div>
-                
                 <div v-if="searchResults.length > 0" class="search-results">
-                  <div v-for="result in searchResults" :key="result.id" class="search-result-item" @click="sendRequest(result)">
+                  <div v-for="result in searchResults" :key="result.id" class="search-result-item" @click="selectFriend(result)">
                     <div class="search-result-avatar">
-                      <img :src="result.avatar_url || 'img/default-avatar.png'" :alt="result.username">
+                      <img :src="result.avatar_url || 'https://via.placeholder.com/30'" :alt="result.username">
                     </div>
                     <div class="search-result-info">
                       <p>{{ result.username }}</p>
                       <p class="email">{{ result.email }}</p>
                     </div>
-                    <button class="add-friend-btn">
-                      <i class="bi bi-person-plus"></i>
-                    </button>
                   </div>
                 </div>
-                
-                <div v-else-if="friendUsername.length >= 3 && !searching" class="empty-search-results">
-                  <i class="bi bi-search"></i>
-                  <p>Пользователи не найдены</p>
-                </div>
-                
-                <div v-else-if="!friendUsername || friendUsername.length < 3" class="search-hint">
-                  <p>Введите не менее 3 символов для поиска пользователей</p>
-                </div>
-                
-                <div v-else-if="searching" class="searching-indicator">
-                  <div class="spinner"></div>
-                  <p>Поиск пользователей...</p>
-                </div>
-                
                 <p v-if="friendError" class="error-message">{{ friendError }}</p>
               </div>
             </div>
@@ -474,52 +271,35 @@
         </div>
 
         <!-- Вкладка профиля -->
-        <div v-if="currentTab === 'profile'" class="tab-content profile-tab">
+        <div v-if="currentTab === 'profile'" class="tab-content">
           <div class="tab-header">
             <h2>Мой профиль</h2>
-            <div class="tab-actions">
-              <button class="add-btn" @click="showAddGiftModal = true">
-                <i class="bi bi-plus-circle"></i> Добавить подарок
-              </button>
-            </div>
+            <button class="add-btn" @click="showAddGiftModal = true">
+              <i class="bi bi-plus-circle"></i> Добавить подарок
+            </button>
           </div>
 
           <div class="profile-container">
-            <div class="profile-info-card">
-              <div class="profile-header">
-                <div class="profile-avatar">
-                  <img :src="profile.avatar_url || 'img/default-avatar.png'" alt="Аватар пользователя">
-                  <button class="change-avatar-btn" @click="showChangeAvatarModal = true">
-                    <i class="bi bi-pencil"></i>
-                  </button>
-                </div>
-                
-                <div class="profile-details">
-                  <h3>{{ profile.username }}</h3>
-                  <p>{{ profile.email }}</p>
-                </div>
+            <div class="profile-info">
+              <div class="profile-avatar">
+                <img :src="profile.avatar_url || 'https://via.placeholder.com/100'" alt="Аватар пользователя">
+                <button class="change-avatar-btn" @click="showChangeAvatarModal = true">
+                  <i class="bi bi-pencil"></i>
+                </button>
               </div>
-              
-              <div class="profile-actions">
+              <div class="profile-details">
+                <h3>{{ profile.username }}</h3>
+                <p>{{ profile.email }}</p>
                 <button class="edit-profile-btn" @click="showEditProfileModal = true">
                   <i class="bi bi-pencil"></i> Изменить профиль
                 </button>
-                <div class="theme-toggle">
-                  <span>Тема:</span>
-                  <button class="theme-btn" :class="{ active: profile.theme === 'light' }" @click="changeTheme('light')">
-                    <i class="bi bi-sun"></i> Светлая
-                  </button>
-                  <button class="theme-btn" :class="{ active: profile.theme === 'dark' }" @click="changeTheme('dark')">
-                    <i class="bi bi-moon"></i> Тёмная
-                  </button>
-                </div>
               </div>
             </div>
 
-            <div class="profile-gifts-section">
+            <div class="profile-gifts">
               <h3>Мой список желаний</h3>
               <div class="gifts-list">
-                <div v-for="gift in myGifts" :key="gift.id" class="gift-card" :class="{ 'booked': gift.is_booked }">
+                <div v-for="gift in myGifts" :key="gift.id" class="gift-card">
                   <div class="gift-image" v-if="gift.image_url">
                     <img :src="gift.image_url" alt="Изображение подарка">
                   </div>
@@ -538,11 +318,6 @@
                       </p>
                     </div>
                   </div>
-                  <div class="gift-status" v-if="gift.is_booked">
-                    <span class="booked-label">
-                      <i class="bi bi-bookmark-check-fill"></i> Забронировано
-                    </span>
-                  </div>
                   <div class="gift-actions">
                     <button class="edit-btn" @click="editGift(gift)">
                       <i class="bi bi-pencil"></i>
@@ -552,7 +327,6 @@
                     </button>
                   </div>
                 </div>
-                
                 <div v-if="myGifts.length === 0" class="empty-state">
                   <i class="bi bi-emoji-frown"></i>
                   <p>В вашем списке пока нет желаемых подарков. Добавьте их, чтобы друзья знали, что вам подарить!</p>
@@ -571,28 +345,9 @@
                 </button>
               </div>
               <div class="modal-body">
-                <div class="avatar-upload-container">
-                  <div v-if="avatarPreview" class="avatar-preview">
-                    <img :src="avatarPreview" alt="Preview">
-                    <button class="remove-avatar-btn" @click="removeAvatarPreview">
-                      <i class="bi bi-x-circle"></i>
-                    </button>
-                  </div>
-                  
-                  <label v-else for="avatar-upload" class="avatar-upload-label">
-                    <div class="upload-placeholder">
-                      <i class="bi bi-cloud-arrow-up"></i>
-                      <span>Загрузить изображение</span>
-                    </div>
-                  </label>
-                  
-                  <input type="file" id="avatar-upload" accept="image/*" @change="handleAvatarUpload" class="hidden-input">
-                </div>
-                
+                <input type="text" v-model="newAvatarUrl" placeholder="URL изображения">
                 <div class="modal-actions">
-                  <button @click="updateAvatar" :disabled="!avatarFile && !newAvatarUrl">
-                    Сохранить
-                  </button>
+                  <button @click="updateAvatar">Сохранить</button>
                 </div>
               </div>
             </div>
@@ -626,36 +381,14 @@
                 </button>
               </div>
               <div class="modal-body">
-                <input type="text" v-model="newGift.title" placeholder="Название подарка" maxlength="100">
-                <textarea v-model="newGift.description" placeholder="Описание" maxlength="500"></textarea>
-                
-                <div class="gift-image-upload-container">
-                  <div v-if="giftImagePreview" class="gift-image-preview">
-                    <img :src="giftImagePreview" alt="Preview">
-                    <button class="remove-gift-image-btn" @click="removeGiftImagePreview">
-                      <i class="bi bi-x-circle"></i>
-                    </button>
-                  </div>
-                  
-                  <label v-else for="gift-image-upload" class="gift-image-upload-label">
-                    <div class="upload-placeholder">
-                      <i class="bi bi-cloud-arrow-up"></i>
-                      <span>Загрузить изображение подарка</span>
-                    </div>
-                  </label>
-                  
-                  <input type="file" id="gift-image-upload" accept="image/*" @change="handleGiftImageUpload" class="hidden-input">
-                </div>
-                
+                <input type="text" v-model="newGift.title" placeholder="Название подарка">
+                <textarea v-model="newGift.description" placeholder="Описание"></textarea>
+                <input type="text" v-model="newGift.image_url" placeholder="URL изображения">
                 <input type="text" v-model="newGift.link" placeholder="Ссылка на товар (если есть)">
                 <input type="text" v-model="newGift.article_number" placeholder="Артикул (если есть)">
                 <textarea v-model="newGift.additional_info" placeholder="Дополнительная информация (размер, цвет и т.д.)"></textarea>
-                
                 <div class="modal-actions">
-                  <button @click="saveGift" :disabled="savingGift">
-                    <span v-if="!savingGift">{{ editingGift ? 'Сохранить' : 'Добавить' }}</span>
-                    <span v-else class="spinner-small"></span>
-                  </button>
+                  <button @click="saveGift">{{ editingGift ? 'Сохранить' : 'Добавить' }}</button>
                 </div>
               </div>
             </div>
@@ -663,7 +396,7 @@
         </div>
 
         <!-- Вкладка админ-панели -->
-        <div v-if="currentTab === 'admin' && isAdmin" class="tab-content admin-tab">
+        <div v-if="currentTab === 'admin' && isAdmin" class="tab-content">
           <div class="tab-header">
             <h2>Административная панель</h2>
           </div>
@@ -673,14 +406,12 @@
               <h3>Управление пользователями</h3>
               <div class="search-container">
                 <input type="text" v-model="adminUserSearch" placeholder="Поиск пользователя...">
-                <i class="bi bi-search"></i>
               </div>
-              
               <div class="users-list">
                 <div v-for="u in filteredAdminUsers" :key="u.id" class="user-item">
                   <div class="user-info">
                     <div class="user-avatar">
-                      <img :src="u.avatar_url || 'img/default-avatar.png'" :alt="u.username">
+                      <img :src="u.avatar_url || 'https://via.placeholder.com/40'" :alt="u.username">
                     </div>
                     <div class="user-details">
                       <p class="username">{{ u.username }}</p>
@@ -704,9 +435,7 @@
               <h3>Все рекомендации</h3>
               <div class="search-container">
                 <input type="text" v-model="adminRecommendationSearch" placeholder="Поиск рекомендации...">
-                <i class="bi bi-search"></i>
               </div>
-              
               <div class="recommendations-admin-list">
                 <div v-for="rec in filteredAdminRecommendations" :key="rec.id" class="recommendation-admin-item">
                   <div class="recommendation-admin-info">
@@ -737,7 +466,7 @@
               </div>
               <div class="modal-body" v-if="selectedRecommendation">
                 <div class="recommendation-details">
-                  <div class="recommendation-video" v-if="selectedRecommendation.media_url && isVideoUrl(selectedRecommendation.media_url)">
+                  <div class="recommendation-video" v-if="selectedRecommendation.media_url && selectedRecommendation.media_url.includes('mp4')">
                     <video controls>
                       <source :src="selectedRecommendation.media_url" type="video/mp4">
                     </video>
@@ -745,10 +474,8 @@
                   <div class="recommendation-image" v-else-if="selectedRecommendation.media_url">
                     <img :src="selectedRecommendation.media_url" alt="Изображение подарка">
                   </div>
-                  
                   <h4>{{ selectedRecommendation.title }}</h4>
                   <p>{{ selectedRecommendation.description }}</p>
-                  
                   <div class="recommendation-links" v-if="selectedRecommendation.link || selectedRecommendation.article_number">
                     <a v-if="selectedRecommendation.link" :href="selectedRecommendation.link" target="_blank">
                       <i class="bi bi-link-45deg"></i> Ссылка на товар: {{ selectedRecommendation.link }}
@@ -757,13 +484,11 @@
                       <i class="bi bi-upc"></i> Артикул: {{ selectedRecommendation.article_number }}
                     </p>
                   </div>
-                  
                   <div class="recommendation-hashtags">
                     <span v-for="tag in selectedRecommendation.hashtags" :key="tag" class="hashtag">
                       #{{ tag }}
                     </span>
                   </div>
-                  
                   <p class="author">Автор: {{ selectedRecommendation.username }}</p>
                   <p class="created-at">Создано: {{ formatDate(selectedRecommendation.created_at) }}</p>
                 </div>
@@ -773,81 +498,15 @@
         </div>
       </main>
 
-      <!-- Модальное окно уведомлений -->
-      <div class="modal" v-if="showNotificationsModal">
-        <div class="modal-content notifications-modal">
-          <div class="modal-header">
-            <h3>Уведомления</h3>
-            <div class="modal-header-actions">
-              <button v-if="notifications.some(n => !n.is_read)" class="mark-all-read-btn" @click="markAllNotificationsAsRead">
-                <i class="bi bi-check-all"></i> Прочитать все
-              </button>
-              <button class="close-btn" @click="showNotificationsModal = false">
-                <i class="bi bi-x-lg"></i>
-              </button>
-            </div>
-          </div>
-          
-          <div class="modal-body">
-            <div class="notifications-list">
-              <div v-for="notification in notifications" :key="notification.id" 
-                   class="notification-item" 
-                   :class="{ 'unread': !notification.is_read }">
-                
-                <div class="notification-avatar">
-                  <img :src="notification.sender_avatar || 'img/default-avatar.png'" alt="Avatar">
-                </div>
-                
-                <div class="notification-content">
-                  <p>{{ notification.content }}</p>
-                  <span class="notification-time">{{ formatDate(notification.created_at) }}</span>
-                </div>
-                
-                <div class="notification-actions">
-                  <button v-if="!notification.is_read" class="mark-read-btn" @click="markNotificationAsRead(notification.id)">
-                    <i class="bi bi-check"></i>
-                  </button>
-                  <button class="delete-notification-btn" @click="deleteNotification(notification.id)">
-                    <i class="bi bi-trash"></i>
-                  </button>
-                </div>
-                
-                <!-- Кнопки действий для различных типов уведомлений -->
-                <div v-if="notification.type === 'friend_request'" class="notification-action-buttons">
-                  <button class="accept-btn" @click="acceptFriendRequestFromNotification(notification)">
-                    <i class="bi bi-check-lg"></i> Принять
-                  </button>
-                  <button class="reject-btn" @click="rejectFriendRequestFromNotification(notification)">
-                    <i class="bi bi-x-lg"></i> Отклонить
-                  </button>
-                </div>
-              </div>
-              
-              <div v-if="notifications.length === 0" class="empty-state">
-                <i class="bi bi-bell-slash"></i>
-                <p>У вас нет уведомлений</p>
-              </div>
-            </div>
-          </div>
-        </div>
+      <!-- Уведомления -->
+      <div class="notification" v-if="notification.show" :class="notification.type">
+        {{ notification.message }}
       </div>
-      
-      <!-- Всплывающие уведомления -->
-      <transition name="notification-slide">
-        <div class="notification-toast" v-if="notification.show" :class="notification.type">
-          <i class="bi" :class="getNotificationIcon()"></i>
-          <p>{{ notification.message }}</p>
-          <button class="close-notification" @click="hideNotification">
-            <i class="bi bi-x"></i>
-          </button>
-        </div>
-      </transition>
     </div>
   </div>
 
   <script src="js/supabase.js"></script>
   <script src="js/auth.js"></script>
-  <script src="js/notifications.js"></script>
   <script src="js/recommendations.js"></script>
   <script src="js/friends.js"></script>
   <script src="js/profile.js"></script>
