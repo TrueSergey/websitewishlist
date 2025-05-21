@@ -5,6 +5,7 @@ async function getAllUsers() {
 		if (!user || !user.is_admin) {
 			throw new Error('Нет прав администратора')
 		}
+
 		const { data, error } = await supabase
 			.from('users')
 			.select('*')
