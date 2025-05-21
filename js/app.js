@@ -17,7 +17,20 @@ const app = Vue.createApp({
           message: '',
           type: 'success'
         },
-        
+        // Для TikTok-режима
+    showTikTokView: false,
+    activeVideoIndex: null,
+    isVideoPlaying: false,
+    intersectionObserver: null,
+
+        // Для загрузки файлов
+    selectedAvatarFile: null,
+    avatarPreview: null,
+    selectedRecommendationFile: null,
+    recommendationPreview: null,
+    selectedGiftImageFile: null,
+    giftImagePreview: null,
+
         // Профиль
         profile: {},
         showChangeAvatarModal: false,
@@ -53,6 +66,8 @@ const app = Vue.createApp({
         },
   
         // Друзья
+        friendsSubTab: 'all',
+        friendRequests: [],
         friends: [],
         friendSearch: '',
         showAddFriendModal: false,
@@ -98,7 +113,237 @@ const app = Vue.createApp({
   
         return filtered;
       },
+      
+      // Методы для работы с файлами
+handleAvatarUpload(event) {
+  const file = event.target.files[0];
+  if (!file) return;
   
+  this.selectedAvatarFile = file;
+  this.avatarPreview = URL.createObjectURL(file);
+},
+playVideoIfVisible(index) {
+  if (this.activeVideoIndex === index) {
+    const video = this.$refs[`video-${index}`][0];
+    if (video) {
+      video.play();
+      this.isVideoPlaying = true;
+    }
+  }
+},
+
+toggleVideoPlayback(index) {
+  const video = this.$refs[`video-${index}`][0];
+  if (!video) return;
+  
+  if (video.paused) {
+    video.play();
+    this.isVideoPlaying = true;
+  } else {
+    video.pause();
+    this.isVideoPlaying = false;
+  }
+},
+
+openLink(link) {
+  window.open(link, '_blank');
+},
+
+setupTikTokScroll() {
+  // Настраиваем IntersectionObserver для отслеживания видимости видео
+  if ('IntersectionObserver' in window) {
+    this.intersectionObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        // Находим индекс видео из id элемента
+        const id = entry.target.id;
+        const index = parseInt(id.split('-')[1]);
+        
+        if (entry.isIntersecting) {
+          this.activeVideoIndex = index;
+          this.playVideoIfVisible(index);
+        } else {
+          // Если видео больше не видно, останавливаем его
+          const video = this.$refs[`video-${index}`][0];
+          if (video) {
+            video.pause();
+          }
+        }
+      });
+    }, { threshold: 0.7 }); // Видео считается видимым, если 70% его в области просмотра
+  }
+},
+
+// Обновите метод mounted
+async mounted() {
+  await this.fetchUserData();
+  
+  // Слушаем изменения поля поиска для друзей
+  this.$watch('friendUsername', (newValue) => {
+    if (newValue && newValue.length >= 3) {
+      this.searchFriends();
+    } else {
+      this.searchResults = [];
+    }
+  });
+  
+  // Наблюдаем за изменением showTikTokView
+  this.$watch('showTikTokView', (newValue) => {
+    if (newValue) {
+      // Если открыли TikTok-режим, настраиваем прокрутку
+      this.$nextTick(() => {
+        this.setupTikTokScroll();
+        
+        // Добавляем все видео в наблюдение
+        this.filteredRecommendations.forEach((_, index) => {
+          const videoContainer = document.getElementById(`video-container-${index}`);
+          if (videoContainer && this.intersectionObserver) {
+            this.intersectionObserver.observe(videoContainer);
+          }
+        });
+        
+        // Запускаем первое видимое видео
+        this.activeVideoIndex = 0;
+        this.playVideoIfVisible(0);
+      });
+    } else {
+      // Если закрыли TikTok-режим, останавливаем все видео
+      this.filteredRecommendations.forEach((_, index) => {
+        const video = this.$refs[`video-${index}`]?.[0];
+        if (video) {
+          video.pause();
+        }
+        
+        // Удаляем наблюдение
+        const videoContainer = document.getElementById(`video-container-${index}`);
+        if (videoContainer && this.intersectionObserver) {
+          this.intersectionObserver.unobserve(videoContainer);
+        }
+      });
+      
+      // Очищаем наблюдатель
+      if (this.intersectionObserver) {
+        this.intersectionObserver.disconnect();
+      }
+    }
+  });
+},
+async updateAvatar() {
+  if (!this.selectedAvatarFile) {
+    this.showNotification('Выберите изображение', 'error');
+    return;
+  }
+
+  const { url, error } = await uploadFile(this.selectedAvatarFile, 'avatars');
+  
+  if (error) {
+    this.showNotification(error.message || 'Ошибка при загрузке аватара', 'error');
+    return;
+  }
+
+  const updateResult = await updateAvatar(url);
+  
+  if (updateResult.error) {
+    this.showNotification(updateResult.error.message || 'Ошибка при обновлении аватара', 'error');
+    return;
+  }
+
+  this.showNotification('Аватар успешно обновлен');
+  this.profile.avatar_url = url;
+  this.showChangeAvatarModal = false;
+  this.selectedAvatarFile = null;
+  this.avatarPreview = null;
+  this.fetchUserData();
+},
+
+handleRecommendationMediaUpload(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  
+  this.selectedRecommendationFile = file;
+  this.recommendationPreview = URL.createObjectURL(file);
+},
+
+isImageFile(file) {
+  return file && file.type.startsWith('image/');
+},
+
+isVideoFile(file) {
+  return file && file.type.startsWith('video/');
+},
+
+setupLazyLoading() {
+  if ('IntersectionObserver' in window) {
+    const lazyImageObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          const lazyImage = entry.target;
+          lazyImage.src = lazyImage.dataset.src;
+          lazyImage.classList.add('loaded');
+          lazyImageObserver.unobserve(lazyImage);
+        }
+      });
+    });
+
+    const lazyImages = document.querySelectorAll('.lazy-image');
+    lazyImages.forEach(image => {
+      lazyImageObserver.observe(image);
+    });
+  } else {
+    // Запасной вариант для браузеров без IntersectionObserver
+    document.querySelectorAll('.lazy-image').forEach(img => {
+      img.src = img.dataset.src;
+      img.classList.add('loaded');
+    });
+  }
+},
+
+async addRecommendation() {
+  if (!this.newRecommendation.title) {
+    this.showNotification('Название обязательно для заполнения', 'error');
+    return;
+  }
+
+  let mediaUrl = '';
+  
+  if (this.selectedRecommendationFile) {
+    const bucket = this.isVideoFile(this.selectedRecommendationFile) ? 'videos' : 'images';
+    const { url, error: uploadError } = await uploadFile(this.selectedRecommendationFile, bucket, 'recommendations');
+    
+    if (uploadError) {
+      this.showNotification(uploadError.message || 'Ошибка при загрузке медиафайла', 'error');
+      return;
+    }
+    
+    mediaUrl = url;
+  }
+
+  const recommendation = {
+    ...this.newRecommendation,
+    media_url: mediaUrl
+  };
+
+  const { data, error } = await addRecommendation(recommendation);
+  
+  if (error) {
+    this.showNotification(error.message || 'Ошибка при добавлении рекомендации', 'error');
+    return;
+  }
+
+  this.showNotification('Рекомендация успешно добавлена');
+  this.showAddRecommendationModal = false;
+  this.newRecommendation = {
+    title: '',
+    description: '',
+    media_url: '',
+    link: '',
+    article_number: '',
+    hashtags: ''
+  };
+  this.selectedRecommendationFile = null;
+  this.recommendationPreview = null;
+  this.fetchRecommendations();
+},
+
       // Фильтрация друзей по поиску
       filteredFriends() {
         if (!this.friendSearch) {
@@ -187,15 +432,15 @@ const app = Vue.createApp({
           this.authError = 'Пожалуйста, заполните все поля';
           return;
         }
-  
-        const { data, error } = await signUp(this.email, this.password, this.username);
+      
+        const { data, error, message } = await signUp(this.email, this.password, this.username);
         
         if (error) {
           this.authError = error.message || 'Ошибка регистрации';
           return;
         }
-  
-        this.showNotification('Регистрация успешна! Теперь вы можете войти в систему.');
+      
+        this.showNotification(message || 'Регистрация успешна! Теперь вы можете войти в систему.');
         this.authMode = 'login';
         this.resetAuthForm();
       },
@@ -290,7 +535,42 @@ const app = Vue.createApp({
           this.selectedHashtags.push(tag);
         }
       },
-  
+      
+      async fetchFriendRequests() {
+        this.friendRequests = await getFriendRequests();
+      },
+      
+      async acceptFriendRequest(friendId) {
+        const { error } = await acceptFriendRequest(friendId);
+        
+        if (error) {
+          this.showNotification(error.message || 'Ошибка при принятии запроса', 'error');
+          return;
+        }
+      
+        this.showNotification('Запрос на дружбу принят');
+        this.fetchFriendRequests();
+        this.fetchFriends();
+      },
+      
+      async rejectFriendRequest(friendId) {
+        const { error } = await rejectFriendRequest(friendId);
+        
+        if (error) {
+          this.showNotification(error.message || 'Ошибка при отклонении запроса', 'error');
+          return;
+        }
+      
+        this.showNotification('Запрос на дружбу отклонен');
+        this.fetchFriendRequests();
+      },
+      
+      // Обновите существующий метод fetchFriends
+      async fetchFriends() {
+        this.friends = await getFriends();
+        this.fetchFriendRequests();
+      },
+
       // Методы для друзей
       async fetchFriends() {
         this.friends = await getFriends();

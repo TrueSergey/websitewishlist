@@ -1,14 +1,17 @@
 <!DOCTYPE html>
 <html lang="ru">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Сайт подарков друзьям</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
-  <link rel="stylesheet" href="css/styles.css">
-  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-</head>
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#ffffff">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Сайт подарков друзьям</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="css/styles.css">
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  </head>
 <body>
   <div id="app">
     <!-- Экран авторизации -->
@@ -60,10 +63,59 @@
       </nav>
 
       <main>
+        <img class="lazy-image" :data-src="recommendation.avatar_url || 'https://via.placeholder.com/40'" alt="Аватар пользователя" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1'%3E%3C/svg%3E">
         <!-- Вкладка рекомендаций -->
+        <div class="tiktok-style-container" v-if="showTikTokView">
+          <button class="tiktok-close-btn" @click="showTikTokView = false">
+            <i class="bi bi-x-lg"></i>
+          </button>
+          
+          <div class="tiktok-style-recommendations" ref="tiktokContainer">
+            <div v-for="(recommendation, index) in filteredRecommendations" :key="recommendation.id" class="tiktok-recommendation">
+              <video v-if="recommendation.media_url && recommendation.media_url.includes('mp4')" 
+                     class="tiktok-recommendation-media" 
+                     :ref="`video-${index}`"
+                     loop
+                     @loadedmetadata="playVideoIfVisible(index)"
+                     @click="toggleVideoPlayback(index)">
+                <source :src="recommendation.media_url" type="video/mp4">
+              </video>
+              <img v-else-if="recommendation.media_url" 
+                   class="tiktok-recommendation-media" 
+                   :src="recommendation.media_url" 
+                   alt="Изображение подарка">
+              
+              <div class="tiktok-recommendation-info">
+                <div class="tiktok-recommendation-author">
+                  <img :src="recommendation.avatar_url || 'https://via.placeholder.com/40'" :alt="recommendation.username">
+                  <span>{{ recommendation.username }}</span>
+                </div>
+                <h3>{{ recommendation.title }}</h3>
+                <p>{{ recommendation.description }}</p>
+                <div class="tiktok-recommendation-hashtags">
+                  <span v-for="tag in recommendation.hashtags" :key="tag" class="hashtag">
+                    #{{ tag }}
+                  </span>
+                </div>
+              </div>
+              
+              <div class="tiktok-recommendation-actions">
+                <button class="tiktok-action-btn" v-if="recommendation.link" @click="openLink(recommendation.link)">
+                  <i class="bi bi-link-45deg"></i>
+                </button>
+                <button class="tiktok-action-btn" v-if="recommendation.user_id === user.id || isAdmin" @click="deleteRecommendation(recommendation.id)">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div v-if="currentTab === 'recommendations'" class="tab-content">
-          <div class="tab-header">
-            <h2>Рекомендации подарков</h2>
+          <div class="tab-actions">
+            <button class="view-mode-btn" @click="showTikTokView = true">
+              <i class="bi bi-fullscreen"></i> TikTok режим
+            </button>
             <button class="add-btn" @click="showAddRecommendationModal = true">
               <i class="bi bi-plus-circle"></i> Добавить
             </button>
@@ -119,65 +171,89 @@
             </div>
           </div>
 
-          <!-- Модальное окно добавления рекомендации -->
-          <div class="modal" v-if="showAddRecommendationModal">
-            <div class="modal-content">
-              <div class="modal-header">
-                <h3>Добавить рекомендацию</h3>
-                <button class="close-btn" @click="showAddRecommendationModal = false">
-                  <i class="bi bi-x-lg"></i>
-                </button>
-              </div>
-              <div class="modal-body">
-                <input type="text" v-model="newRecommendation.title" placeholder="Название подарка">
-                <textarea v-model="newRecommendation.description" placeholder="Описание"></textarea>
-                <input type="text" v-model="newRecommendation.media_url" placeholder="URL фото или видео">
-                <input type="text" v-model="newRecommendation.link" placeholder="Ссылка на товар (если есть)">
-                <input type="text" v-model="newRecommendation.article_number" placeholder="Артикул (если есть)">
-                <input type="text" v-model="newRecommendation.hashtags" placeholder="Хэштеги через запятую">
-                <div class="modal-actions">
-                  <button @click="addRecommendation">Добавить</button>
-                </div>
-              </div>
-            </div>
-          </div>
+          <!-- В модальном окне добавления рекомендации -->
+<div class="modal-body">
+  <input type="text" v-model="newRecommendation.title" placeholder="Название подарка">
+  <textarea v-model="newRecommendation.description" placeholder="Описание"></textarea>
+  <div class="file-upload">
+    <label for="recommendation-media-upload">Выберите фото или видео</label>
+    <input type="file" id="recommendation-media-upload" @change="handleRecommendationMediaUpload" accept="image/*,video/*">
+  </div>
+  <div v-if="selectedRecommendationFile" class="preview">
+    <img v-if="isImageFile(selectedRecommendationFile)" :src="recommendationPreview" alt="Предпросмотр изображения">
+    <video v-else-if="isVideoFile(selectedRecommendationFile)" controls>
+      <source :src="recommendationPreview" :type="selectedRecommendationFile.type">
+    </video>
+  </div>
+  <input type="text" v-model="newRecommendation.link" placeholder="Ссылка на товар (если есть)">
+  <input type="text" v-model="newRecommendation.article_number" placeholder="Артикул (если есть)">
+  <input type="text" v-model="newRecommendation.hashtags" placeholder="Хэштеги через запятую">
+  <div class="modal-actions">
+    <button @click="addRecommendation">Добавить</button>
+  </div>
+</div>
         </div>
 
         <!-- Вкладка друзей -->
-        <div v-if="currentTab === 'friends'" class="tab-content">
-          <div class="tab-header">
-            <h2>Мои друзья</h2>
-            <button class="add-btn" @click="showAddFriendModal = true">
-              <i class="bi bi-person-plus"></i> Добавить
-            </button>
-          </div>
+       <!-- В секции Друзья -->
+<div class="friends-tabs">
+  <button :class="{ active: friendsSubTab === 'all' }" @click="friendsSubTab = 'all'">
+    Все друзья
+  </button>
+  <button :class="{ active: friendsSubTab === 'requests' }" @click="friendsSubTab = 'requests'">
+    Запросы <span v-if="friendRequests.length > 0" class="badge">{{ friendRequests.length }}</span>
+  </button>
+</div>
 
-          <div class="search-container">
-            <input type="text" v-model="friendSearch" placeholder="Поиск по имени...">
-          </div>
+<div v-if="friendsSubTab === 'all'" class="friends-list">
+  <div v-for="friend in filteredFriends" :key="friend.id" class="friend-card" :class="{ 'pending': friend.status === 'pending' }">
+    <div class="friend-info">
+      <div class="friend-avatar">
+        <img :src="friend.avatar_url || 'https://via.placeholder.com/50'" :alt="friend.username">
+      </div>
+      <h3>{{ friend.username }}</h3>
+      <span v-if="friend.status === 'pending'" class="status-badge">
+        {{ friend.direction === 'outgoing' ? 'Запрос отправлен' : 'Ожидает подтверждения' }}
+      </span>
+    </div>
+    <div class="friend-actions">
+      <button v-if="friend.status === 'accepted'" class="view-btn" @click="viewFriendGifts(friend)">
+        <i class="bi bi-gift"></i> Список желаний
+      </button>
+      <button class="delete-btn" @click="removeFriend(friend.id)">
+        <i class="bi bi-person-x"></i>
+      </button>
+    </div>
+  </div>
+  <div v-if="filteredFriends.length === 0" class="empty-state">
+    <i class="bi bi-emoji-frown"></i>
+    <p>У вас пока нет друзей. Добавьте друзей, чтобы видеть их желаемые подарки.</p>
+  </div>
+</div>
 
-          <div class="friends-list">
-            <div v-for="friend in filteredFriends" :key="friend.id" class="friend-card">
-              <div class="friend-info">
-                <div class="friend-avatar">
-                  <img :src="friend.avatar_url || 'https://via.placeholder.com/50'" :alt="friend.username">
-                </div>
-                <h3>{{ friend.username }}</h3>
-              </div>
-              <div class="friend-actions">
-                <button class="view-btn" @click="viewFriendGifts(friend)">
-                  <i class="bi bi-gift"></i> Список желаний
-                </button>
-                <button class="delete-btn" @click="removeFriend(friend.id)">
-                  <i class="bi bi-person-x"></i>
-                </button>
-              </div>
-            </div>
-            <div v-if="filteredFriends.length === 0" class="empty-state">
-              <i class="bi bi-emoji-frown"></i>
-              <p>У вас пока нет друзей. Добавьте друзей, чтобы видеть их желаемые подарки.</p>
-            </div>
-          </div>
+<div v-if="friendsSubTab === 'requests'" class="friend-requests-list">
+  <div v-for="request in friendRequests" :key="request.id" class="friend-request-card">
+    <div class="friend-info">
+      <div class="friend-avatar">
+        <img :src="request.user.avatar_url || 'https://via.placeholder.com/50'" :alt="request.user.username">
+      </div>
+      <h3>{{ request.user.username }}</h3>
+      <p>хочет добавить вас в друзья</p>
+    </div>
+    <div class="friend-request-actions">
+      <button class="accept-btn" @click="acceptFriendRequest(request.user.id)">
+        <i class="bi bi-check-lg"></i> Принять
+      </button>
+      <button class="reject-btn" @click="rejectFriendRequest(request.user.id)">
+        <i class="bi bi-x-lg"></i> Отклонить
+      </button>
+    </div>
+  </div>
+  <div v-if="friendRequests.length === 0" class="empty-state">
+    <i class="bi bi-emoji-smile"></i>
+    <p>У вас нет запросов на добавление в друзья.</p>
+  </div>
+</div>
 
           <!-- Модальное окно списка желаний друга -->
           <div class="modal" v-if="showFriendGiftsModal">
@@ -335,23 +411,19 @@
             </div>
           </div>
 
-          <!-- Модальное окно изменения аватара -->
-          <div class="modal" v-if="showChangeAvatarModal">
-            <div class="modal-content">
-              <div class="modal-header">
-                <h3>Изменить аватар</h3>
-                <button class="close-btn" @click="showChangeAvatarModal = false">
-                  <i class="bi bi-x-lg"></i>
-                </button>
-              </div>
-              <div class="modal-body">
-                <input type="text" v-model="newAvatarUrl" placeholder="URL изображения">
-                <div class="modal-actions">
-                  <button @click="updateAvatar">Сохранить</button>
-                </div>
-              </div>
-            </div>
-          </div>
+          <!-- В модальном окне изменения аватара -->
+<div class="modal-body">
+  <div class="file-upload">
+    <label for="avatar-upload">Выберите изображение</label>
+    <input type="file" id="avatar-upload" @change="handleAvatarUpload" accept="image/*">
+  </div>
+  <div v-if="selectedAvatarFile" class="preview">
+    <img :src="avatarPreview" alt="Предпросмотр аватара">
+  </div>
+  <div class="modal-actions">
+    <button @click="updateAvatar" :disabled="!selectedAvatarFile">Сохранить</button>
+  </div>
+</div>
 
           <!-- Модальное окно редактирования профиля -->
           <div class="modal" v-if="showEditProfileModal">

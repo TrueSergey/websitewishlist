@@ -1,36 +1,36 @@
 // Функции для работы с аутентификацией
 async function signUp(email, password, username) {
-    try {
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-      });
-  
-      if (error) {
-        throw error;
-      }
-  
-      // Сохраняем данные пользователя в таблицу users
-      const { error: profileError } = await supabase
-        .from('users')
-        .insert([
-          {
-            id: data.user.id,
-            username,
-            email,
-          },
-        ]);
-  
-      if (profileError) {
-        throw profileError;
-      }
-  
-      return { data };
-    } catch (error) {
-      console.error('Error signing up:', error);
-      return { error };
+  try {
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+    });
+
+    if (error) {
+      throw error;
     }
+
+    // Сохраняем данные пользователя в таблицу users
+    const { error: profileError } = await supabase
+      .from('users')
+      .insert([
+        {
+          id: data.user.id,
+          username,
+          email,
+        },
+      ]);
+
+    if (profileError) {
+      throw profileError;
+    }
+
+    return { data, message: "Письмо для подтверждения отправлено на вашу почту" };
+  } catch (error) {
+    console.error('Error signing up:', error);
+    return { error };
   }
+}
   
   async function signIn(email, password) {
     try {
