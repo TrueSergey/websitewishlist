@@ -3,7 +3,7 @@ async function getAllUsers() {
     try {
       const user = await getCurrentUser();
       if (!user || !user.is_admin) {
-        throw new Error('Нет прав администратора');
+        throw new Error('Нет прав адмминистратора');
       }
   
       const { data, error } = await supabase
