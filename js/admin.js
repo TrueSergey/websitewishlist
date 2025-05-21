@@ -3,13 +3,13 @@ async function getAllUsers() {
     try {
       const user = await getCurrentUser();
       if (!user || !user.is_admin) {
-        throw new Error('Нет прав адмминистратора');
+        throw new Error('Нет прав администратора');
       }
   
       const { data, error } = await supabase
         .from('users')
         .select('*')
-        .order('created_at', { ascending: false });
+        .order('created_at', {ascending: false});
   
       if (error) {
         throw error;
